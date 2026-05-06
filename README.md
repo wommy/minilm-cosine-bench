@@ -70,3 +70,42 @@ CC0 — public domain. Fork it, adapt it, ship it.
 ## Origin
 
 Sister to [`wommy/gifts`](https://github.com/wommy/gifts) — the doctrine corpus. This is the working-tool corpus.
+
+## Context — the actual use case
+
+This bench exists because of [**codemogger**](https://github.com/wommy/codemogger) — a semantic code-search tool that wants this kernel to be fast on whatever hardware it runs on. **You don't need to clone or read codemogger to help here**; this harness is the integration boundary.
+
+Pipeline that consumes the kernel:
+
+```
+source code files
+  ↓ chunk into spans (~200 tokens each)
+  ↓ embed with MiniLM-L6-v2 q8                  ← inference layer (ONNX, see below)
+  ↓ store as 384-dim i8 vectors in sqlite
+  ↓ query: embed natural-language query → 384-dim i8
+  ↓ cosine-similarity vs corpus                 ← THIS KERNEL
+  ↓ top-K results
+```
+
+For a 10k-chunk codebase index, every query computes 10k cosine distances. The kernel is the rank-time hot path. Currently ~9M ops/s on Zen+; modern uarchs (AVX-VNNI / AVX-512 / ARM SVE) likely 2-4× faster. Drop in your impl, the bench tells the truth.
+
+## Two open questions (kernel layer + runtime layer)
+
+**Q1 (this repo) — kernel optimization**: faster cosine on better silicon. Drop `cosine_<yours>.zig`, see speedup. Sandbox is here.
+
+**Q2 (separate, no public repo yet) — ONNX runtime port-away**: codemogger currently uses vendored ORT 1.21.0 C API for the MiniLM q8 inference layer. We want off it entirely — pure-Zig path. Two candidates surveyed:
+
+- **abyesilyurt/minilm.c port** to Zig fp32 (~1500-2500 LOC; 3 hot kernels = ~85% wall: `QGemmU8S8`, `LayerNorm`, `Softmax`)
+- **Z-Ant** — pure-Zig ONNX runtime, 30+ ops, vendor option
+
+Concrete pain we're hitting on Q2: ORT debug-from-source fills /tmp 8×; sccache wired to local S3 but rebuild not retried; q8 vs fp32 parity unvalidated; combined onnxruntime-node + @huggingface/transformers is ~280MB of platform binaries we want gone.
+
+**Q1 vs Q2 are separate surfaces** — Q2 is the bigger / harder ask. If runtime-internals is more your jam than SIMD kernels, that's the conversation.
+
+## License
+
+CC0 — public domain. Fork it, adapt it, ship it.
+
+## Origin
+
+Sister to [`wommy/gifts`](https://github.com/wommy/gifts) — the doctrine corpus.
