@@ -63,6 +63,19 @@ If you're on ARM:
 
 Saga-21 of [glom_MR](https://github.com/wommy/gifts) standing on Zen+ Ryzen 3400G was getting 8M ops/s on `zen2` impl, but suspected modern uarchs could 2-4× via VPDPBUSD. Rather than guess, share a sandbox where anyone can drop in their best try.
 
+## Sample integration (codemogger-shape demo)
+
+A runnable demo of the kernel-in-context, no codemogger fork required:
+
+```
+zig build example
+```
+
+Outputs query→top-K ranking against a 100-chunk corpus. Source: `src/example.zig` — read it for the integration pattern (kernel call → distance array → sort by similarity → top-K). In real codemogger, `chunk_idx` maps to `(file_path, span_start, span_end)` from sqlite alongside the embeddings.
+
+Swap kernels in `example.zig` (one line: `const kernel = cosine_<yours>.cosineBatchI8_<yours>;`) to see your impl in the consumption shape.
+
+
 ## License
 
 CC0 — public domain. Fork it, adapt it, ship it.
@@ -79,7 +92,7 @@ Pipeline that consumes the kernel:
 
 ```
 source code files
-  ↓ chunk into spans (~200 tokens each)
+  ↓ chunk into spans (size depends on tokenizer; smallish)
   ↓ embed with MiniLM-L6-v2 q8                  ← inference layer (ONNX, see below)
   ↓ store as 384-dim i8 vectors in sqlite
   ↓ query: embed natural-language query → 384-dim i8
@@ -87,7 +100,7 @@ source code files
   ↓ top-K results
 ```
 
-For a 10k-chunk codebase index, every query computes 10k cosine distances. The kernel is the rank-time hot path. Currently ~9M ops/s on Zen+; modern uarchs (AVX-VNNI / AVX-512 / ARM SVE) likely 2-4× faster. Drop in your impl, the bench tells the truth.
+For an N-chunk codebase index, every query computes N cosine distances against the corpus. The kernel is the rank-time hot path. Currently ~9M ops/s on Zen+; modern uarchs (AVX-VNNI / AVX-512 / ARM SVE) likely 2-4× faster. Drop in your impl, the bench tells the truth.
 
 ## Two open questions (kernel layer + runtime layer)
 
