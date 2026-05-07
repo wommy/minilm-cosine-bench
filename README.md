@@ -108,8 +108,8 @@ For an N-chunk codebase index, every query computes N cosine distances against t
 
 **Q2 (separate, no public repo yet) — ONNX runtime port-away**: codemogger currently uses vendored ORT 1.21.0 C API for the MiniLM q8 inference layer. We want off it entirely — pure-Zig path. Two candidates surveyed:
 
-- **abyesilyurt/minilm.c port** to Zig fp32 (~1500-2500 LOC; 3 hot kernels = ~85% wall: `QGemmU8S8`, `LayerNorm`, `Softmax`)
-- **Z-Ant** — pure-Zig ONNX runtime, 30+ ops, vendor option
+- **[abyesilyurt/minilm.c](https://github.com/abyesilyurt/minilm.c) port** to Zig fp32 (port size + kernel breakdown approximate from prior research; 3 hot kernels we identified: `QGemmU8S8`, `LayerNorm`, `Softmax`)
+- **[ZantFoundation/Z-Ant](https://github.com/ZantFoundation/Z-Ant)** — pure-Zig neural-net deployment toolkit (microcontroller-shaped, but adoptable for desktop ONNX runtime use); vendor-instead-of-write path
 
 Concrete pain we're hitting on Q2: ORT debug-from-source fills /tmp 8×; sccache wired to local S3 but rebuild not retried; q8 vs fp32 parity unvalidated; combined onnxruntime-node + @huggingface/transformers is ~280MB of platform binaries we want gone.
 
